@@ -14,39 +14,97 @@
 # Serveur web pour Weather watcher
 # Fermeture de l'abri en cas de pluie (Indi client "Park")
 
-SerialPort="/dev/StationMeteo"
-DDevices={3468:[['svalue1',0,'Text'],['svalue2',70,"Hext"]],3465:[['svalue1',0,'Pluie']]}
+#SerialPort="/dev/StationMeteo"
+SerialPort="/dev/ttyUSB0"
+DDevices={3468:[['svalue1',0,'Text'],['svalue2',70,"Hext"]],3465:[['svalue1',0,'Pluie']],3466:[['svalue3',0,'Vent']]}
+#ADevices={"Tciel":0,"CouvN":0,"Text":0,"Hext":0,"Pres":0,"SQM":0}
+ADevices={"Tciel":[0,"1234"],"CouvN":[0,"1235"],"SQM":[0,"1236"],"Cpluie":[0,""]}
+
+
+Vmax=0
 
 import paho.mqtt.client as mqtt
 import json
+import time
+import threading
+import serial
+from http.server import HTTPServer, BaseHTTPRequestHandler
+
 
 def on_connect(client, userdata, flags, rc):
     print("Connected with result code "+str(rc))
     client.subscribe("domoticz/out")
 
 def on_message(client, userdata, msg):
-    rep=msg.payload
-    domoticzjson=json.loads(rep)
-    #for i, v in enumerate(domoticzjson["result"]):
-    Index=domoticzjson['idx']
-    if Index in DDevices.keys():
-        for i in DDevices[Index]:
-            print(i[2],domoticzjson[i[0]])
+	rep=msg.payload
+	domoticzjson=json.loads(rep)
+	#for i, v in enumerate(domoticzjson["result"]):
+	Index=domoticzjson['idx']
+	if Index in DDevices.keys():
+		for i in DDevices[Index]:
+			#print(i[2],domoticzjson[i[0]])
+			if i[2] != "Vent" or domoticzjson[i[0]] != 59:
+				i[1]=domoticzjson[i[0]]
 
+def ArduinoData():
+	# Lecture des données série
+	Ser = serial.Serial(SerialPort, 9600)
+	while True:
+		try:
+			msg = Ser.readline().decode()
+			[nom,valeur]=msg.split("=")
+			if nom in ADevices.keys():
+				ADevices[nom][0]=valeur
+		except:
+			time.sleep(5)
+
+def SendDomoticz():
+	time.sleep(60) # Attend la disponibilité des données
+	while 1:
+		# Envoi les données à Domoticz toutes les minutes
+		for i in ADevices.keys():
+			if ADevices[i][1] != "":
+				# TODO envoi des données par MQTT
+				#print(i+": "+str(ADevices[i][0])+" -> "+ADevices[i][1])
+		time.sleep(60)
+		
+	
+class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
+	def do_HEAD(self):
+		self.send_response(200)
+		self.send_header("Content-type", "text/plain")
+		self.end_headers()
+	def do_GET(self):
+		self.send_response(200)
+		# Informations en provenance de Domoticz
+		for i in DDevices.keys():
+			for j in DDevices[i]:
+				msg=j[2]+"="+str(j[1])+"\n"
+				self.wfile.write(bytes(msg, encoding='utf8'))
+		# Informations en provenance d'Arduino
+		for i in ADevices.keys():
+			msg=i+"="+str(ADevices[i][0])
+			self.wfile.write(bytes(msg, encoding='utf8'))
+		#self.wfile.write(b"Gust=0\n")
+		#self.wfile.write(b"Nuages=0\n")
+
+print("Demarrage")
+
+# Port série
+thread = threading.Thread(target=ArduinoData)
+thread.start()
+
+# Envoi des données à Domoticz
+thread2 = threading.Thread(target=SendDomoticz)
+thread2.start()
+
+# Client MQTT        
 client=mqtt.Client();
 client.on_connect=on_connect
 client.on_message=on_message
-
 client.connect("domopi.local", 1883, 60)
-
 client.loop_start()
 
-print("Demarrage")
-while True:
-    pass
-
-
-### Acquisition des données de Domoticz ###
-# Pluie
-# Vent
-# T°/H% (temporaire)
+# Serveur http
+httpd = HTTPServer(('', 1789), SimpleHTTPRequestHandler)
+httpd.serve_forever()
