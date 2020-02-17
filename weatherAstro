@@ -1,0 +1,53 @@
+#!/usr/bin/python3
+
+# Serveur météo pour Weather watcher et Domoticz
+# Version:  0.1
+# Date:     17/02/2020
+# Auteur:   Serge CLAUS
+# Licence:  GPL V3
+
+# Démon de gestion météo:
+# -----------------------
+# Acquisition des données de l'Arduino (port série)
+# Acquisition des données de Domoticz (MQTT)
+# Transmission des données à Domoticz (MQTT)
+# Serveur web pour Weather watcher
+# Fermeture de l'abri en cas de pluie (Indi client "Park")
+
+SerialPort="/dev/StationMeteo"
+DDevices={3468:(['svalue1',0,'Text'],['svalue2',70,"Hext"]),3465:(['svalue',0,'Pluie'])}
+
+import paho.mqtt.client as mqtt
+import json
+
+def on_connect(client, userdata, flags, rc):
+    print("Connected with result code "+str(rc))
+    client.subscribe("domoticz/out")
+
+def on_message(client, userdata, msg):
+    rep=msg.payload
+    domoticzjson=json.loads(rep)
+    #for i, v in enumerate(domoticzjson["result"]):
+    Index=domoticzjson['idx']
+    if Index in DDevices.keys():
+        print("Ok")
+        for i in DDevices[Index]:
+            print(i[2])
+
+client=mqtt.Client();
+client.on_connect=on_connect
+client.on_message=on_message
+
+client.connect("domopi.local", 1883, 60)
+
+client.loop_start()
+
+print("Demarrage")
+while True:
+    pass
+
+
+### Acquisition des données de Domoticz ###
+# Pluie
+# Vent
+# T°/H% (temporaire)
