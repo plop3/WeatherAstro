@@ -16,9 +16,10 @@
 
 #SerialPort="/dev/StationMeteo"
 SerialPort="/dev/ttyUSB0"
-DDevices={3468:[['svalue1',0,'Text'],['svalue2',70,"Hext"]],3465:[['svalue1',0,'Pluie']],3466:[['svalue3',0,'Vent']]}
+#DDevices={3468:[['svalue1',0,'Text'],['svalue2',70,"Hext"]],3465:[['svalue1',0,'Pluie']],3466:[['svalue3',0,'Vent']]}
+DDevices={3465:[['svalue1',0,'Pluie']],3466:[['svalue3',0,'Vent']]} # Vent (nouveau) 3540
 #ADevices={"Tciel":0,"CouvN":0,"Text":0,"Hext":0,"Pres":0,"SQM":0}
-ADevices={"Tciel":[0,"1234"],"CouvN":[0,"1235"],"SQM":[0,"1236"],"Cpluie":[0,""]}
+ADevices={"Text":0,"Hext":0,"Pres":0,"Tciel":0,"CouvN":0} #,"SQM":0,"Cpluie":0}
 
 
 Vmax=0
@@ -44,41 +45,45 @@ def on_message(client, userdata, msg):
 	if Index in DDevices.keys():
 		for i in DDevices[Index]:
 			Valeur=domoticzjson[i[0]]
-			if i[2] != "Vent" or (float(Valeur) > 58 and float(Valeur)<60):
+			if i[2] != "Vent":
 				i[1]=Valeur
+			elif  (int(Valeur) != 165): # Bug de la station météo
+				#print('**********************************')
+				i[1]=float(Valeur)*0.36
 
 def ArduinoData():
 	# Lecture des données série 
 	# Attente de la présence du port série
+	time.sleep(10)
 	portOk = Path(SerialPort)
 	while not portOk.exists():
 		print("*",)
 		time.sleep(10)
 	Ser = serial.Serial(SerialPort, 9600)
-			
 	while True:
 		try:
-			msg = Ser.readline().decode().rstrip('\n')
+			msg = Ser.readline().decode().rstrip("\n")
+			#print(msg)
 			[nom,valeur]=msg.split("=")
 			if nom in ADevices.keys():
-				ADevices[nom][0]=valeur
+				ADevices[nom]=valeur
 		except:
 			while not portOk.exists():
 				print("*",)
 				time.sleep(10)
 			Ser = serial.Serial(SerialPort, 9600)
-			Print("*",)
-		time.sleep(5)
-
+			
 def SendDomoticz():
 	time.sleep(60) # Attend la disponibilité des données
 	while 1:
 		# Envoi les données à Domoticz toutes les minutes
-		for i in ADevices.keys():
-			if ADevices[i][1] != "":
-				# TODO envoi des données par MQTT
-				#print(i+": "+str(ADevices[i][0])+" -> "+ADevices[i][1])
-				pass
+		msg="{\"command\": \"udevice\", \"idx\": 3529, \"svalue\": \""+str(float(ADevices["Text"]))+";"+str(float(ADevices["Hext"]))+";0;"+str(float(ADevices["Pres"]))+";0\"}"
+		#print(msg)
+		client.publish("domoticz/in",msg)
+		msg="{\"command\": \"udevice\", \"idx\": 484, \"svalue\":\""+str(float(ADevices["Tciel"]))+"\"}"
+		client.publish("domoticz/in",msg)
+		msg="{\"command\": \"udevice\", \"idx\": 3539, \"svalue\":\""+str(float(ADevices["CouvN"]))+"\"}"
+		client.publish("domoticz/in",msg)
 		time.sleep(60)
 		
 	
@@ -96,7 +101,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 				self.wfile.write(bytes(msg, encoding='utf8'))
 		# Informations en provenance d'Arduino
 		for i in ADevices.keys():
-			msg=i+"="+str(ADevices[i][0])+"\n"
+			msg=i+"="+str(ADevices[i])+"\n"
 			self.wfile.write(bytes(msg, encoding='utf8'))
 		#self.wfile.write(b"Gust=0\n")
 		#self.wfile.write(b"Nuages=0\n")
