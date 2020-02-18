@@ -66,7 +66,8 @@ def SendDomoticz():
 			if ADevices[i][1] != "":
 				# TODO envoi des données par MQTT
 				#print(i+": "+str(ADevices[i][0])+" -> "+ADevices[i][1])
-		time.sleep(60)
+				pass
+		time2.sleep(60)
 		
 	
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
