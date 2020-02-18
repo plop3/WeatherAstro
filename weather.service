@@ -1,0 +1,13 @@
+[Unit]
+Description=Autossh
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=astro
+
+ExecStart=/usr/local/bin/weatherAstro
+Restart=always
+RestartSec=60
+
