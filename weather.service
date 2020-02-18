@@ -1,5 +1,5 @@
 [Unit]
-Description=Autossh
+Description=Station météo
 Wants=network-online.target
 After=network-online.target
 
@@ -10,4 +10,7 @@ User=astro
 ExecStart=/usr/local/bin/weatherAstro
 Restart=always
 RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
 
