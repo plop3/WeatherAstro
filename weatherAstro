@@ -28,6 +28,7 @@ import json
 import time
 import threading
 import serial
+from pathlib import Path
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 
@@ -42,21 +43,32 @@ def on_message(client, userdata, msg):
 	Index=domoticzjson['idx']
 	if Index in DDevices.keys():
 		for i in DDevices[Index]:
-			#print(i[2],domoticzjson[i[0]])
-			if i[2] != "Vent" or domoticzjson[i[0]] != 59:
-				i[1]=domoticzjson[i[0]]
+			Valeur=domoticzjson[i[0]]
+			if i[2] != "Vent" or (float(Valeur) > 58 and float(Valeur)<60):
+				i[1]=Valeur
 
 def ArduinoData():
-	# Lecture des données série
+	# Lecture des données série 
+	# Attente de la présence du port série
+	portOk = Path(SerialPort)
+	while not portOk.exists():
+		print("*",)
+		time.sleep(10)
 	Ser = serial.Serial(SerialPort, 9600)
+			
 	while True:
 		try:
-			msg = Ser.readline().decode()
+			msg = Ser.readline().decode().rstrip('\n')
 			[nom,valeur]=msg.split("=")
 			if nom in ADevices.keys():
 				ADevices[nom][0]=valeur
 		except:
-			time.sleep(5)
+			while not portOk.exists():
+				print("*",)
+				time.sleep(10)
+			Ser = serial.Serial(SerialPort, 9600)
+			Print("*",)
+		time.sleep(5)
 
 def SendDomoticz():
 	time.sleep(60) # Attend la disponibilité des données
@@ -67,7 +79,7 @@ def SendDomoticz():
 				# TODO envoi des données par MQTT
 				#print(i+": "+str(ADevices[i][0])+" -> "+ADevices[i][1])
 				pass
-		time2.sleep(60)
+		time.sleep(60)
 		
 	
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -84,7 +96,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 				self.wfile.write(bytes(msg, encoding='utf8'))
 		# Informations en provenance d'Arduino
 		for i in ADevices.keys():
-			msg=i+"="+str(ADevices[i][0])
+			msg=i+"="+str(ADevices[i][0])+"\n"
 			self.wfile.write(bytes(msg, encoding='utf8'))
 		#self.wfile.write(b"Gust=0\n")
 		#self.wfile.write(b"Nuages=0\n")
