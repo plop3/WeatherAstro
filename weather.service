@@ -1,5 +1,5 @@
 [Unit]
-Description=Autossh
+Description=Station météo
 Wants=network-online.target
 After=network-online.target
 
