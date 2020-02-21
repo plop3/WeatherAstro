@@ -47,7 +47,7 @@ def on_message(client, userdata, msg):
 			Valeur=domoticzjson[i[0]]
 			if i[2] != "Vent":
 				i[1]=Valeur
-			elif  (int(Valeur) != 165): # Bug de la station météo
+			elif  (int(Valeur) <163 or int(Valeur) > 165): # Bug de la station météo
 				#print('**********************************')
 				i[1]=float(Valeur)*0.36
 
